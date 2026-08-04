@@ -101,8 +101,14 @@ docker compose up -d postgres
 
 ## Environment configuration
 
-Copy `.env.example` to `.env` when the backend is added. Never commit real API
-keys or production passwords.
+Copy `.env.example` to `.env` for local development. Never commit real API keys
+or production passwords.
+
+## Deployment
+
+Use the Neon PostgreSQL and Render deployment guide in `DEPLOYMENT.md`. The
+included `render.yaml` creates the frontend and backend services while keeping
+all database credentials and API keys in the hosting dashboard.
 
 ## Backend API
 
