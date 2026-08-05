@@ -209,6 +209,10 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 
 .right-column { display: grid; gap: 16px; }
 .weak-panel, .activity-panel { padding: 18px; }
+.dashboard-empty-state { min-height: 118px; padding: 18px; display: grid; place-items: center; align-content: center; gap: 7px; border: 1px dashed var(--border); border-radius: 8px; color: var(--muted); text-align: center; }
+.dashboard-empty-state svg { color: var(--mint); }
+.dashboard-empty-state strong { color: var(--text); font: 600 11px monospace; }
+.dashboard-empty-state p { max-width: 270px; margin: 0; font: 9px/1.5 monospace; }
 .section-title { display: flex; align-items: center; justify-content: space-between; margin-bottom: 13px; }
 .section-title > span { display: flex; align-items: center; gap: 9px; font: 600 12px monospace; }
 .section-title button { display: flex; align-items: center; border: 0; background: none; color: var(--muted); font: 10px monospace; cursor: pointer; }
@@ -412,6 +416,10 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 .summary-card small svg { color: var(--mint); }
 .progress-main-grid { display: grid; grid-template-columns: 1.25fr 0.75fr; gap: 15px; margin-top: 15px; }
 .topic-mastery, .next-plan { min-height: 410px; padding: 21px; }
+.progress-empty-state { min-height: 300px; display: grid; place-items: center; align-content: center; gap: 9px; color: var(--muted); text-align: center; }
+.progress-empty-state svg { color: var(--mint); }
+.progress-empty-state h2 { margin: 0; color: var(--text); font-size: 18px; }
+.progress-empty-state p { max-width: 330px; margin: 0; font: 10px/1.6 monospace; }
 .mastery-row { display: grid; grid-template-columns: 145px 1fr 38px; gap: 12px; align-items: center; margin-top: 23px; }
 .mastery-row > span { color: #c2cbc7; font: 10px monospace; }
 .mastery-row > div { height: 7px; overflow: hidden; border-radius: 99px; background: #29332f; }

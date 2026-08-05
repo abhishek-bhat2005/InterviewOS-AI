@@ -71,17 +71,15 @@ const navItems = [
   { label: "Progress", icon: BarChart3 },
 ];
 
-const activity = [4, 3, 4, 4, 3, 1, 0];
-
 export default function Home() {
   const [activeNav, setActiveNav] = useState("Dashboard");
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [bookmarked, setBookmarked] = useState(false);
-  const [goalComplete, setGoalComplete] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [sessionLoading, setSessionLoading] = useState(true);
   const [problems, setProblems] = useState<ProblemSummary[]>([]);
+  const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [submissionCount, setSubmissionCount] = useState(0);
   const [backendOnline, setBackendOnline] = useState(false);
   const [practiceProblemSlug, setPracticeProblemSlug] = useState("");
@@ -110,15 +108,29 @@ export default function Home() {
 
   useEffect(() => {
     if (!user) return;
+    let cancelled = false;
     getSubmissions()
-      .then((response) => setSubmissionCount(response.totalElements))
-      .catch(() => setSubmissionCount(0));
+      .then((response) => {
+        if (cancelled) return;
+        setSubmissions(response.content);
+        setSubmissionCount(response.totalElements);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setSubmissions([]);
+        setSubmissionCount(0);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [user]);
 
   if (sessionLoading) return <LoadingScreen />;
   if (!user) return <AuthScreen onAuthenticated={setUser} />;
 
+  const metrics = buildLearningMetrics(submissions, problems);
   const featuredProblem =
+    problems.find((problem) => problem.slug === submissions[0]?.problemSlug) ??
     problems.find((problem) => problem.slug === "longest-substring-without-repeating-characters") ??
     problems[0];
   const initials = user.fullName
@@ -128,12 +140,20 @@ export default function Home() {
     .slice(0, 2)
     .toUpperCase();
   const firstName = user.fullName.split(/\s+/)[0];
+  const greeting = timeGreeting(new Date(), user.timezone);
+
+  const handleSubmissionCreated = (submission: Submission) => {
+    setSubmissions((current) => [submission, ...current.filter((item) => item.id !== submission.id)]);
+    setSubmissionCount((current) => current + 1);
+  };
 
   const handleLogout = async () => {
     try {
       await logout();
     } finally {
       setUser(null);
+      setSubmissions([]);
+      setSubmissionCount(0);
     }
   };
 
@@ -209,7 +229,7 @@ export default function Home() {
               <span>Search anything</span>
               <kbd>⌘ K</kbd>
             </button>
-            <div className="date-chip"><CalendarDays size={16} /> Aug 3, 2026</div>
+            <div className="date-chip"><CalendarDays size={16} /> {formatHeaderDate(new Date(), user.timezone)}</div>
             <div className="profile-menu-wrap">
               <button
                 className="profile-button"
@@ -268,6 +288,8 @@ export default function Home() {
               problems={problems}
               practiceProblemSlug={practiceProblemSlug}
               userInitials={initials}
+              metrics={metrics}
+              onSubmissionCreated={handleSubmissionCreated}
               onOpenPractice={(problemSlug) => {
                 setPracticeProblemSlug(problemSlug);
                 setActiveNav("Practice");
@@ -279,8 +301,8 @@ export default function Home() {
           <div className="welcome-row">
             <div>
               <p className="eyebrow">PERSONAL WORKSPACE / DASHBOARD</p>
-              <h1>Good morning, {firstName}</h1>
-              <p className="welcome-copy">Keep your momentum. One focused session is ready.</p>
+              <h1>{greeting}, {firstName}</h1>
+              <p className="welcome-copy">{metrics.totalAttempts === 0 ? "Your learning profile is ready for its first session." : "Keep your momentum. One focused session is ready."}</p>
             </div>
             <button className="secondary-action"><Gauge size={17} /> Take skill assessment</button>
           </div>
@@ -291,48 +313,48 @@ export default function Home() {
                 <span className="icon-box"><Target size={20} /></span>
                 <div>
                   <p className="label">TODAY&apos;S GOAL</p>
-                  <h2>Solve 3 problems and review 1 topic</h2>
+                  <h2>Complete 3 practice attempts</h2>
                 </div>
                 <button
-                  className={goalComplete ? "check-button checked" : "check-button"}
-                  onClick={() => setGoalComplete(!goalComplete)}
-                  aria-label="Toggle goal completion"
+                  className={metrics.todayAttempts >= 3 ? "check-button checked" : "check-button"}
+                  onClick={() => setActiveNav("Practice")}
+                  aria-label={metrics.todayAttempts >= 3 ? "Daily goal complete" : "Open practice"}
                 >
                   <Check size={17} />
                 </button>
               </div>
               <div className="goal-progress-row">
-                <div className="progress-track"><span style={{ width: goalComplete ? "100%" : "67%" }} /></div>
-                <strong>{goalComplete ? "100%" : "67%"}</strong>
+                <div className="progress-track"><span style={{ width: `${metrics.todayGoalPercent}%` }} /></div>
+                <strong>{metrics.todayGoalPercent}%</strong>
               </div>
-              <p className="microcopy">{goalComplete ? "Daily target complete — excellent work." : "2 of 3 problems solved · 1 topic remaining"}</p>
+              <p className="microcopy">{metrics.todayAttempts >= 3 ? "Daily target complete — excellent work." : `${metrics.todayAttempts} of 3 attempts completed today`}</p>
             </article>
 
             <article className="panel stat-card amber">
               <Flame size={21} />
-              <strong>18</strong>
+              <strong>{metrics.currentStreak}</strong>
               <span>day streak</span>
-              <small>Personal best: 24</small>
+              <small>Personal best: {metrics.bestStreak}</small>
             </article>
 
             <article className="panel stat-card">
               <Trophy size={21} />
-              <strong>42</strong>
-              <span>problems solved</span>
-              <small>+8 this week</small>
+              <strong>{metrics.attemptedProblems}</strong>
+              <span>problems attempted</span>
+              <small>{metrics.thisWeekAttempts} attempts this week</small>
             </article>
 
             <article className="panel stat-card">
               <TrendingUp size={21} />
-              <strong>68<span>%</span></strong>
+              <strong>{metrics.weeklyGoalPercent}<span>%</span></strong>
               <span>weekly goal</span>
-              <div className="mini-progress"><i /></div>
+              <div className="mini-progress"><i style={{ width: `${metrics.weeklyGoalPercent}%` }} /></div>
             </article>
 
             <article className="panel stat-card muted-stat">
               <Clock3 size={21} />
-              <strong>3.2<span>h</span></strong>
-              <span>focused practice</span>
+              <strong>{formatDuration(metrics.thisWeekFocusMinutes)}</strong>
+              <span>estimated practice</span>
               <small>This week</small>
             </article>
           </section>
@@ -342,7 +364,7 @@ export default function Home() {
               <div className="problem-topline">
                 <span className="code-badge"><Code2 size={24} /></span>
                 <div className="problem-heading">
-                  <p className="label">CONTINUE WHERE YOU LEFT OFF</p>
+                  <p className="label">{metrics.totalAttempts === 0 ? "START YOUR FIRST PROBLEM" : "CONTINUE WHERE YOU LEFT OFF"}</p>
                   <h2>{featuredProblem?.title ?? "Loading practice problems..."}</h2>
                 </div>
                 <button
@@ -370,27 +392,30 @@ export default function Home() {
               </div>
 
               <button className="primary-action" onClick={() => setActiveNav("Practice")}>
-                <Play size={18} fill="currentColor" /> Continue practice <ArrowRight size={18} />
+                <Play size={18} fill="currentColor" /> {metrics.totalAttempts === 0 ? "Start practice" : "Continue practice"} <ArrowRight size={18} />
               </button>
             </article>
 
             <div className="right-column">
               <article className="panel weak-panel">
                 <div className="section-title">
-                  <span><Target size={18} /> Weak topics</span>
-                  <button>View all <ChevronRight size={15} /></button>
+                  <span><Target size={18} /> Topic coverage</span>
+                  <button onClick={() => setActiveNav("Progress")}>View all <ChevronRight size={15} /></button>
                 </div>
-                <TopicRow title="Dynamic Programming" solved="7 / 17 solved" score={42} />
-                <TopicRow title="Graphs" solved="9 / 20 solved" score={45} />
+                {metrics.totalAttempts === 0 ? (
+                  <div className="dashboard-empty-state"><Target size={20} /><strong>No topic data yet</strong><p>Submit your first practice attempt to begin tracking coverage.</p></div>
+                ) : metrics.topicCoverage.slice(0, 2).map((topic) => (
+                  <TopicRow key={topic.slug} title={topic.title} solved={`${topic.attempted} / ${topic.total} attempted`} score={topic.score} />
+                ))}
               </article>
 
               <article className="panel activity-panel">
                 <div className="section-title">
                   <span><CalendarDays size={18} /> Weekly activity</span>
-                  <small>7 problems</small>
+                  <small>{metrics.thisWeekAttempts} attempts</small>
                 </div>
                 <div className="activity-grid">
-                  {activity.map((level, day) => (
+                  {metrics.activityLevels.map((level, day) => (
                     <div className="day" key={day}>
                       <span>{["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"][day]}</span>
                       {[0, 1, 2, 3].map((block) => (
@@ -497,21 +522,25 @@ function FeaturePage({
   problems,
   practiceProblemSlug,
   userInitials,
+  metrics,
+  onSubmissionCreated,
   onOpenPractice,
 }: {
   active: string;
   problems: ProblemSummary[];
   practiceProblemSlug: string;
   userInitials: string;
+  metrics: LearningMetrics;
+  onSubmissionCreated: (submission: Submission) => void;
   onOpenPractice: (problemSlug: string) => void;
 }) {
-  if (active === "Practice") return <PracticeWorkspace problems={problems} initialSlug={practiceProblemSlug} />;
+  if (active === "Practice") return <PracticeWorkspace problems={problems} initialSlug={practiceProblemSlug} onSubmissionCreated={onSubmissionCreated} />;
   if (active === "Mock Interview") {
     if (problems.length === 0) return <div className="feature-page"><PageHeader kicker="MOCK INTERVIEW / DSA" title="Preparing interview room" description="Loading high-frequency questions from the InterviewOS API..." /></div>;
     return <MockInterview problems={problems} userInitials={userInitials} onOpenWorkspace={onOpenPractice} />;
   }
   if (active === "Resume Analyzer") return <ResumeAnalyzer />;
-  return <ProgressDashboard />;
+  return <ProgressDashboard metrics={metrics} onStartPractice={() => onOpenPractice("")} />;
 }
 
 function PageHeader({ kicker, title, description, action }: { kicker: string; title: string; description: string; action?: React.ReactNode }) {
@@ -527,7 +556,15 @@ function PageHeader({ kicker, title, description, action }: { kicker: string; ti
   );
 }
 
-function PracticeWorkspace({ problems, initialSlug = "" }: { problems: ProblemSummary[]; initialSlug?: string }) {
+function PracticeWorkspace({
+  problems,
+  initialSlug = "",
+  onSubmissionCreated,
+}: {
+  problems: ProblemSummary[];
+  initialSlug?: string;
+  onSubmissionCreated: (submission: Submission) => void;
+}) {
   const [selectedSlug, setSelectedSlug] = useState(initialSlug);
   const [selectedConcept, setSelectedConcept] = useState("all");
   const [problem, setProblem] = useState<ProblemDetail | null>(null);
@@ -694,6 +731,7 @@ function PracticeWorkspace({ problems, initialSlug = "" }: { problems: ProblemSu
       const submission = submissionResult.value;
       setLatestSubmission(submission);
       setSubmissions((current) => [submission, ...current.filter((item) => item.id !== submission.id)]);
+      onSubmissionCreated(submission);
     } else {
       setError(apiErrorMessage(submissionResult.reason));
     }
@@ -1049,22 +1087,42 @@ function ResumeAnalyzer() {
   );
 }
 
-function ProgressDashboard() {
-  const topics = [
-    ["Arrays & Strings", 82], ["Trees", 64], ["Dynamic Programming", 42], ["Graphs", 45], ["System Design", 58],
-  ] as const;
+function ProgressDashboard({
+  metrics,
+  onStartPractice,
+}: {
+  metrics: LearningMetrics;
+  onStartPractice: () => void;
+}) {
+  const nextTopic = metrics.topicCoverage.find((topic) => topic.attempted < topic.total) ?? metrics.topicCoverage[0];
   return (
     <div className="feature-page">
       <PageHeader kicker="LEARNING ANALYTICS / LAST 30 DAYS" title="Your progress" description="A clear view of momentum, skill coverage, and the highest-impact next steps." action={<button className="secondary-action"><CalendarDays size={16} /> Last 30 days</button>} />
       <div className="progress-summary">
-        <article className="panel summary-card"><span>Problems solved</span><strong>42</strong><small><TrendingUp size={13} /> 23% vs previous period</small></article>
-        <article className="panel summary-card"><span>Acceptance rate</span><strong>71%</strong><small><TrendingUp size={13} /> 8% improvement</small></article>
-        <article className="panel summary-card"><span>Interview score</span><strong>7.8</strong><small>2 mock interviews</small></article>
-        <article className="panel summary-card"><span>Focus time</span><strong>14.6h</strong><small>26 minute avg. session</small></article>
+        <article className="panel summary-card"><span>Practice attempts</span><strong>{metrics.last30Attempts}</strong><small><TrendingUp size={13} /> Last 30 days</small></article>
+        <article className="panel summary-card"><span>Problems attempted</span><strong>{metrics.attemptedProblems}</strong><small>Unique questions in your history</small></article>
+        <article className="panel summary-card"><span>Current streak</span><strong>{metrics.currentStreak}</strong><small>Personal best: {metrics.bestStreak} days</small></article>
+        <article className="panel summary-card"><span>Estimated practice</span><strong>{formatDuration(metrics.last30FocusMinutes)}</strong><small>Based on attempted problem estimates</small></article>
       </div>
       <div className="progress-main-grid">
-        <section className="panel topic-mastery"><div className="section-title"><span><Target size={18} /> Topic mastery</span><small>Based on 96 attempts</small></div>{topics.map(([topic, score]) => <div className="mastery-row" key={topic}><span>{topic}</span><div><i style={{ width: `${score}%` }} /></div><b>{score}%</b></div>)}</section>
-        <section className="panel next-plan"><div className="section-title"><span><BrainCircuit size={18} /> AI study plan</span><small>Updated today</small></div><h2>Focus on graph traversal</h2><p>Your accuracy drops on multi-source BFS and shortest-path variants. Complete this three-step sequence next.</p>{["Review BFS invariants", "Solve Rotting Oranges", "Attempt timed graph interview"].map((item, index) => <div className="plan-step" key={item}><span>{index + 1}</span><p>{item}</p><ChevronRight size={15} /></div>)}<button className="primary-action compact-action">Start recommended session</button></section>
+        <section className="panel topic-mastery">
+          <div className="section-title"><span><Target size={18} /> Topic coverage</span><small>Based on {metrics.totalAttempts} attempts</small></div>
+          {metrics.totalAttempts === 0 ? (
+            <div className="progress-empty-state"><Target size={24} /><h2>No coverage data yet</h2><p>Topic progress begins after your first saved practice attempt.</p></div>
+          ) : metrics.topicCoverage.slice(0, 6).map((topic) => (
+            <div className="mastery-row" key={topic.slug}><span>{topic.title}</span><div><i style={{ width: `${topic.score}%` }} /></div><b>{topic.score}%</b></div>
+          ))}
+        </section>
+        <section className="panel next-plan">
+          <div className="section-title"><span><BrainCircuit size={18} /> Recommended next step</span><small>Live profile</small></div>
+          <h2>{metrics.totalAttempts === 0 ? "Start your first practice problem" : `Build ${nextTopic?.title ?? "DSA"} coverage`}</h2>
+          <p>{metrics.totalAttempts === 0 ? "Choose a DSA concept, work through one important interview question, and save your first attempt." : `You have attempted ${nextTopic?.attempted ?? 0} of ${nextTopic?.total ?? 0} available ${nextTopic?.title ?? "topic"} problems.`}</p>
+          {(metrics.totalAttempts === 0
+            ? ["Choose a DSA concept", "Work through the solution", "Submit to save progress"]
+            : [`Review ${nextTopic?.title ?? "DSA"} fundamentals`, "Attempt the next recommended problem", "Submit to update your profile"]
+          ).map((item, index) => <div className="plan-step" key={item}><span>{index + 1}</span><p>{item}</p><ChevronRight size={15} /></div>)}
+          <button className="primary-action compact-action" onClick={onStartPractice}>{metrics.totalAttempts === 0 ? "Start first problem" : "Continue practice"}</button>
+        </section>
       </div>
     </div>
   );
@@ -1082,6 +1140,148 @@ function TopicRow({ title, solved, score }: { title: string; solved: string; sco
       <b>{score}%</b>
     </button>
   );
+}
+
+type TopicCoverage = {
+  slug: string;
+  title: string;
+  attempted: number;
+  total: number;
+  score: number;
+};
+
+type LearningMetrics = {
+  totalAttempts: number;
+  attemptedProblems: number;
+  todayAttempts: number;
+  todayGoalPercent: number;
+  thisWeekAttempts: number;
+  weeklyGoalPercent: number;
+  last30Attempts: number;
+  currentStreak: number;
+  bestStreak: number;
+  thisWeekFocusMinutes: number;
+  last30FocusMinutes: number;
+  activityLevels: number[];
+  topicCoverage: TopicCoverage[];
+};
+
+function buildLearningMetrics(submissions: Submission[], problems: ProblemSummary[]): LearningMetrics {
+  const now = new Date();
+  const today = startOfLocalDay(now);
+  const weekStart = addLocalDays(today, -((today.getDay() + 6) % 7));
+  const last30Start = addLocalDays(today, -29);
+  const datedSubmissions = submissions
+    .map((submission) => ({ submission, submittedAt: new Date(submission.submittedAt) }))
+    .filter((item) => !Number.isNaN(item.submittedAt.getTime()));
+  const todayKey = localDayKey(today);
+  const todayAttempts = datedSubmissions.filter((item) => localDayKey(item.submittedAt) === todayKey).length;
+  const weekSubmissions = datedSubmissions.filter((item) => item.submittedAt >= weekStart);
+  const last30Submissions = datedSubmissions.filter((item) => item.submittedAt >= last30Start);
+  const activeDayKeys = new Set(datedSubmissions.map((item) => localDayKey(item.submittedAt)));
+  const activityLevels = Array.from({ length: 7 }, (_, index) => {
+    const key = localDayKey(addLocalDays(weekStart, index));
+    return Math.min(4, datedSubmissions.filter((item) => localDayKey(item.submittedAt) === key).length);
+  });
+  const attemptedProblemIds = new Set(submissions.map((submission) => submission.problemId));
+  const estimatedMinutes = new Map(problems.map((problem) => [problem.id, problem.estimatedMinutes ?? 0]));
+
+  const topicCoverage = Array.from(
+    problems.reduce((coverage, problem) => {
+      problem.topics.forEach((topic) => {
+        const current = coverage.get(topic.slug) ?? { slug: topic.slug, title: topic.name, attempted: 0, total: 0, score: 0 };
+        current.total += 1;
+        if (attemptedProblemIds.has(problem.id)) current.attempted += 1;
+        current.score = Math.round((current.attempted / current.total) * 100);
+        coverage.set(topic.slug, current);
+      });
+      return coverage;
+    }, new Map<string, TopicCoverage>()).values(),
+  ).sort((left, right) => left.score - right.score || left.title.localeCompare(right.title));
+
+  return {
+    totalAttempts: submissions.length,
+    attemptedProblems: attemptedProblemIds.size,
+    todayAttempts,
+    todayGoalPercent: Math.min(100, Math.round((todayAttempts / 3) * 100)),
+    thisWeekAttempts: weekSubmissions.length,
+    weeklyGoalPercent: Math.min(100, Math.round((weekSubmissions.length / 7) * 100)),
+    last30Attempts: last30Submissions.length,
+    currentStreak: currentActivityStreak(activeDayKeys, today),
+    bestStreak: bestActivityStreak(activeDayKeys),
+    thisWeekFocusMinutes: estimatedPracticeMinutes(weekSubmissions.map((item) => item.submission), estimatedMinutes),
+    last30FocusMinutes: estimatedPracticeMinutes(last30Submissions.map((item) => item.submission), estimatedMinutes),
+    activityLevels,
+    topicCoverage,
+  };
+}
+
+function estimatedPracticeMinutes(submissions: Submission[], estimatedMinutes: Map<string, number>): number {
+  return Array.from(new Set(submissions.map((submission) => submission.problemId)))
+    .reduce((total, problemId) => total + (estimatedMinutes.get(problemId) ?? 0), 0);
+}
+
+function currentActivityStreak(activeDayKeys: Set<string>, today: Date): number {
+  let cursor = today;
+  if (!activeDayKeys.has(localDayKey(cursor))) cursor = addLocalDays(cursor, -1);
+  let streak = 0;
+  while (activeDayKeys.has(localDayKey(cursor))) {
+    streak += 1;
+    cursor = addLocalDays(cursor, -1);
+  }
+  return streak;
+}
+
+function bestActivityStreak(activeDayKeys: Set<string>): number {
+  const days = Array.from(activeDayKeys)
+    .map((key) => new Date(`${key}T00:00:00`))
+    .sort((left, right) => left.getTime() - right.getTime());
+  let best = 0;
+  let current = 0;
+  let previous: Date | null = null;
+  days.forEach((day) => {
+    current = previous && localDayDifference(previous, day) === 1 ? current + 1 : 1;
+    best = Math.max(best, current);
+    previous = day;
+  });
+  return best;
+}
+
+function localDayDifference(left: Date, right: Date): number {
+  return Math.round((Date.UTC(right.getFullYear(), right.getMonth(), right.getDate()) - Date.UTC(left.getFullYear(), left.getMonth(), left.getDate())) / 86_400_000);
+}
+
+function startOfLocalDay(value: Date): Date {
+  return new Date(value.getFullYear(), value.getMonth(), value.getDate());
+}
+
+function addLocalDays(value: Date, days: number): Date {
+  return new Date(value.getFullYear(), value.getMonth(), value.getDate() + days);
+}
+
+function localDayKey(value: Date): string {
+  const year = value.getFullYear();
+  const month = String(value.getMonth() + 1).padStart(2, "0");
+  const day = String(value.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function formatDuration(minutes: number): string {
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+  return remainingMinutes === 0 ? `${hours}h` : `${hours}h ${remainingMinutes}m`;
+}
+
+function formatHeaderDate(value: Date, timezone: string): string {
+  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: timezone }).format(value);
+}
+
+function timeGreeting(value: Date, timezone: string): string {
+  const hour = Number(new Intl.DateTimeFormat("en-US", { hour: "numeric", hourCycle: "h23", timeZone: timezone }).format(value));
+  if (hour < 12) return "Good morning";
+  if (hour < 17) return "Good afternoon";
+  return "Good evening";
 }
 
 function titleCase(value: string): string {

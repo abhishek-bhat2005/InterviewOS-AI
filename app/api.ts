@@ -224,7 +224,7 @@ export async function startInterview(input: {
 }
 
 export async function getSubmissions(): Promise<PageResponse<Submission>> {
-  return apiRequest<PageResponse<Submission>>("/submissions?size=20");
+  return apiRequest<PageResponse<Submission>>("/submissions?size=100");
 }
 
 export function clearSession(): void {
