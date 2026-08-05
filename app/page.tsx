@@ -71,6 +71,44 @@ const navItems = [
   { label: "Progress", icon: BarChart3 },
 ];
 
+const skillAssessmentQuestions = [
+  {
+    question: "Which data structure gives average O(1) key lookup?",
+    options: ["Linked list", "Hash map", "Binary heap", "Stack"],
+    correctAnswer: 1,
+    topicSlug: "hashing",
+    topicName: "Hashing",
+  },
+  {
+    question: "Which structure does breadth-first search use to process nodes level by level?",
+    options: ["Queue", "Stack", "Min heap", "Hash set only"],
+    correctAnswer: 0,
+    topicSlug: "graphs",
+    topicName: "Graphs",
+  },
+  {
+    question: "What is the search complexity of a balanced binary search tree?",
+    options: ["O(1)", "O(log n)", "O(n)", "O(n log n)"],
+    correctAnswer: 1,
+    topicSlug: "trees",
+    topicName: "Trees",
+  },
+  {
+    question: "Dynamic programming is most useful when a problem has which property?",
+    options: ["Only sorted input", "Overlapping subproblems", "Constant memory", "No repeated work"],
+    correctAnswer: 1,
+    topicSlug: "dynamic-programming",
+    topicName: "Dynamic Programming",
+  },
+  {
+    question: "Which combination supports O(1) get and put in an LRU cache?",
+    options: ["Array and stack", "Heap and queue", "Hash map and doubly linked list", "Tree and set"],
+    correctAnswer: 2,
+    topicSlug: "system-design",
+    topicName: "System Design",
+  },
+] as const;
+
 export default function Home() {
   const [activeNav, setActiveNav] = useState("Dashboard");
   const [menuOpen, setMenuOpen] = useState(false);
@@ -78,6 +116,8 @@ export default function Home() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedSearchIndex, setSelectedSearchIndex] = useState(0);
+  const [assessmentOpen, setAssessmentOpen] = useState(false);
+  const [assessmentAnswers, setAssessmentAnswers] = useState<number[]>([]);
   const [bookmarked, setBookmarked] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [sessionLoading, setSessionLoading] = useState(true);
@@ -119,7 +159,10 @@ export default function Home() {
         setProfileOpen(false);
         setSearchOpen(true);
       }
-      if (event.key === "Escape") setSearchOpen(false);
+      if (event.key === "Escape") {
+        setSearchOpen(false);
+        setAssessmentOpen(false);
+      }
     };
     window.addEventListener("keydown", handleShortcut);
     return () => window.removeEventListener("keydown", handleShortcut);
@@ -170,6 +213,18 @@ export default function Home() {
   const firstName = user.fullName.split(/\s+/)[0];
   const greeting = timeGreeting(new Date(), user.timezone);
   const searchResults = buildSearchResults(searchQuery, problems);
+  const assessmentComplete = assessmentAnswers.length === skillAssessmentQuestions.length;
+  const assessmentScore = skillAssessmentQuestions.reduce(
+    (score, question, index) => score + (assessmentAnswers[index] === question.correctAnswer ? 1 : 0),
+    0,
+  );
+  const assessmentPercent = Math.round((assessmentScore / skillAssessmentQuestions.length) * 100);
+  const assessmentFocus = skillAssessmentQuestions.find(
+    (question, index) => assessmentAnswers[index] !== question.correctAnswer,
+  );
+  const recommendedAssessmentProblem = [...problems]
+    .filter((problem) => !assessmentFocus || problem.topics.some((topic) => topic.slug === assessmentFocus.topicSlug))
+    .sort(compareImportantProblems)[0] ?? problems[0];
 
   const handleSubmissionCreated = (submission: Submission) => {
     setSubmissions((current) => [submission, ...current.filter((item) => item.id !== submission.id)]);
@@ -181,6 +236,21 @@ export default function Home() {
     setSelectedSearchIndex(0);
     setProfileOpen(false);
     setSearchOpen(true);
+  };
+
+  const openAssessment = () => {
+    setAssessmentAnswers([]);
+    setSearchOpen(false);
+    setProfileOpen(false);
+    setAssessmentOpen(true);
+  };
+
+  const startAssessmentRecommendation = () => {
+    if (!recommendedAssessmentProblem) return;
+    setPracticeProblemSlug(recommendedAssessmentProblem.slug);
+    setActiveNav("Practice");
+    setAssessmentOpen(false);
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const openSearchResult = (result: GlobalSearchResult) => {
@@ -287,6 +357,41 @@ export default function Home() {
               })}
             </div>
             <footer className="search-footer"><span><kbd>↑</kbd><kbd>↓</kbd> Navigate</span><span><kbd>Enter</kbd> Open</span><span><kbd>Esc</kbd> Close</span></footer>
+          </section>
+        </div>
+      )}
+
+      {assessmentOpen && (
+        <div className="search-overlay" role="presentation" onMouseDown={() => setAssessmentOpen(false)}>
+          <section className="assessment-dialog" role="dialog" aria-modal="true" aria-label="DSA skill assessment" onMouseDown={(event) => event.stopPropagation()}>
+            <header className="assessment-header">
+              <div><span className="assessment-icon"><Gauge size={20} /></span><div><p className="eyebrow">DSA SKILL ASSESSMENT</p><h2>{assessmentComplete ? "Your assessment result" : `Question ${assessmentAnswers.length + 1} of ${skillAssessmentQuestions.length}`}</h2></div></div>
+              <button onClick={() => setAssessmentOpen(false)} aria-label="Close assessment"><X size={18} /></button>
+            </header>
+            <div className="assessment-progress" aria-label={`${assessmentAnswers.length} of ${skillAssessmentQuestions.length} questions answered`}><i style={{ width: `${(assessmentAnswers.length / skillAssessmentQuestions.length) * 100}%` }} /></div>
+            {!assessmentComplete ? (
+              <div className="assessment-question">
+                <span>{skillAssessmentQuestions[assessmentAnswers.length].topicName}</span>
+                <h3>{skillAssessmentQuestions[assessmentAnswers.length].question}</h3>
+                <div className="assessment-options">
+                  {skillAssessmentQuestions[assessmentAnswers.length].options.map((option, index) => (
+                    <button key={option} onClick={() => setAssessmentAnswers((current) => [...current, index])}><span>{String.fromCharCode(65 + index)}</span>{option}<ArrowRight size={15} /></button>
+                  ))}
+                </div>
+                <p>Choose the best answer. Your result recommends a problem from the InterviewOS library.</p>
+              </div>
+            ) : (
+              <div className="assessment-result">
+                <div className="assessment-score"><strong>{assessmentPercent}<span>%</span></strong><small>{assessmentScore} of {skillAssessmentQuestions.length} correct</small></div>
+                <div className="assessment-result-copy">
+                  <p className="eyebrow">{assessmentLevel(assessmentPercent)}</p>
+                  <h3>{assessmentFocus ? `Strengthen ${assessmentFocus.topicName}` : "Strong DSA foundation"}</h3>
+                  <p>{assessmentFocus ? `Your first missed answer was in ${assessmentFocus.topicName}. Practice that concept next to improve your interview readiness.` : "You answered every question correctly. Continue with another high-frequency interview problem."}</p>
+                </div>
+                <div className="assessment-recommendation"><span><Sparkles size={16} /> Recommended next problem</span><strong>{recommendedAssessmentProblem?.title ?? "Choose a practice problem"}</strong><small>{recommendedAssessmentProblem ? `${titleCase(recommendedAssessmentProblem.difficulty)} · ${recommendedAssessmentProblem.topics.map((topic) => topic.name).join(" · ")}` : "The problem library is still loading."}</small></div>
+                <div className="assessment-actions"><button onClick={() => setAssessmentAnswers([])}>Retake assessment</button><button className="primary-action" onClick={startAssessmentRecommendation} disabled={!recommendedAssessmentProblem}><Play size={16} fill="currentColor" /> Start recommended problem</button></div>
+              </div>
+            )}
           </section>
         </div>
       )}
@@ -420,7 +525,7 @@ export default function Home() {
               <h1>{greeting}, {firstName}</h1>
               <p className="welcome-copy">{metrics.totalAttempts === 0 ? "Your learning profile is ready for its first session." : "Keep your momentum. One focused session is ready."}</p>
             </div>
-            <button className="secondary-action"><Gauge size={17} /> Take skill assessment</button>
+            <button className="secondary-action" onClick={openAssessment}><Gauge size={17} /> Take skill assessment</button>
           </div>
 
           <section className="overview-grid" aria-label="Daily overview">
@@ -1449,6 +1554,12 @@ function timeGreeting(value: Date, timezone: string): string {
   if (hour < 12) return "Good morning";
   if (hour < 17) return "Good afternoon";
   return "Good evening";
+}
+
+function assessmentLevel(score: number): string {
+  if (score < 40) return "FOUNDATION BUILDING";
+  if (score < 80) return "DEVELOPING INTERVIEW SKILLS";
+  return "INTERVIEW READY";
 }
 
 function titleCase(value: string): string {
