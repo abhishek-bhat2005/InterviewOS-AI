@@ -115,6 +115,29 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 .search-button, .date-chip { height: 36px; border: 1px solid var(--border); border-radius: 8px; background: rgba(17, 25, 22, 0.7); display: flex; align-items: center; gap: 8px; color: var(--muted); padding: 0 11px; font: 12px monospace; }
 .search-button { width: 220px; cursor: pointer; }
 .search-button kbd { margin-left: auto; color: #71807a; }
+.search-overlay { position: fixed; inset: 0; z-index: 80; padding: min(13vh, 110px) 18px 18px; display: flex; justify-content: center; align-items: flex-start; background: rgba(4, 8, 7, 0.76); backdrop-filter: blur(8px); }
+.search-dialog { width: min(680px, 100%); overflow: hidden; border: 1px solid #38574d; border-radius: 14px; background: #101714; box-shadow: 0 30px 100px rgba(0,0,0,0.62); }
+.search-input-row { height: 64px; padding: 0 18px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid var(--border); color: var(--mint); }
+.search-input-row input { min-width: 0; flex: 1; border: 0; outline: 0; background: transparent; color: var(--text); font: 14px monospace; }
+.search-input-row input::placeholder { color: #68776f; }
+.search-input-row kbd, .search-footer kbd { padding: 4px 6px; border: 1px solid var(--border); border-radius: 5px; background: #18211e; color: var(--muted); font: 9px monospace; }
+.search-results { max-height: min(58vh, 520px); padding: 10px; overflow-y: auto; }
+.search-results-heading { padding: 7px 9px 10px; display: flex; justify-content: space-between; color: var(--mint); font: 600 9px monospace; letter-spacing: 1px; }
+.search-results-heading small { color: var(--muted); font: 9px monospace; letter-spacing: 0; }
+.search-result { width: 100%; min-height: 62px; padding: 9px 11px; display: flex; align-items: center; gap: 11px; border: 1px solid transparent; border-radius: 8px; background: transparent; color: var(--text); text-align: left; cursor: pointer; }
+.search-result.selected { border-color: #3d695a; background: linear-gradient(90deg, rgba(99,221,183,0.11), rgba(99,221,183,0.025)); }
+.search-result-icon { width: 38px; height: 38px; flex: 0 0 auto; display: grid; place-items: center; border: 1px solid var(--border); border-radius: 8px; color: var(--mint); background: #141e1b; }
+.search-result-copy { min-width: 0; flex: 1; display: grid; gap: 5px; }
+.search-result-copy strong { overflow: hidden; font: 600 11px monospace; text-overflow: ellipsis; white-space: nowrap; }
+.search-result-copy small { overflow: hidden; color: var(--muted); font: 9px monospace; text-overflow: ellipsis; white-space: nowrap; }
+.search-result-type { padding: 4px 6px; border: 1px solid var(--border-soft); border-radius: 4px; color: var(--muted); font: 8px monospace; }
+.search-result > svg { color: #68776f; }
+.search-empty { min-height: 190px; display: grid; place-items: center; align-content: center; gap: 8px; color: var(--muted); text-align: center; }
+.search-empty svg { color: var(--mint); }
+.search-empty strong { color: var(--text); font: 600 12px monospace; }
+.search-empty p { margin: 0; font: 9px monospace; }
+.search-footer { min-height: 42px; padding: 8px 17px; display: flex; align-items: center; gap: 18px; border-top: 1px solid var(--border); color: var(--muted); font: 8px monospace; }
+.search-footer span { display: flex; align-items: center; gap: 5px; }
 .profile-button { width: 36px; height: 36px; border: 1px solid #3e6659; border-radius: 50%; background: #193228; display: grid; place-items: center; cursor: pointer; }
 .profile-button span { font: 600 11px monospace; color: var(--mint-soft); }
 .profile-menu-wrap { position: relative; }
@@ -461,6 +484,11 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 @media (max-width: 650px) {
   .auth-form-panel { padding: 18px; }
   .auth-card { padding: 24px 20px; }
+  .search-overlay { padding: 72px 10px 10px; }
+  .search-input-row { height: 58px; padding: 0 13px; }
+  .search-result { padding: 8px; }
+  .search-result-type { display: none; }
+  .search-footer { gap: 10px; justify-content: center; }
   .topbar { padding-right: 14px; }
   .status-line > span:not(.terminal-icon), .status-line strong { display: none; }
   .date-chip { display: none; }

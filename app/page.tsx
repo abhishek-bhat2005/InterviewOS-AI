@@ -75,6 +75,9 @@ export default function Home() {
   const [activeNav, setActiveNav] = useState("Dashboard");
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedSearchIndex, setSelectedSearchIndex] = useState(0);
   const [bookmarked, setBookmarked] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [sessionLoading, setSessionLoading] = useState(true);
@@ -83,6 +86,7 @@ export default function Home() {
   const [submissionCount, setSubmissionCount] = useState(0);
   const [backendOnline, setBackendOnline] = useState(false);
   const [practiceProblemSlug, setPracticeProblemSlug] = useState("");
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     const restoreSession = async () => {
@@ -105,6 +109,30 @@ export default function Home() {
       })
       .catch(() => setBackendOnline(false));
   }, []);
+
+  useEffect(() => {
+    const handleShortcut = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        setSearchQuery("");
+        setSelectedSearchIndex(0);
+        setProfileOpen(false);
+        setSearchOpen(true);
+      }
+      if (event.key === "Escape") setSearchOpen(false);
+    };
+    window.addEventListener("keydown", handleShortcut);
+    return () => window.removeEventListener("keydown", handleShortcut);
+  }, []);
+
+  useEffect(() => {
+    if (searchOpen) searchInputRef.current?.focus();
+  }, [searchOpen]);
+
+  useEffect(() => {
+    if (!searchOpen) return;
+    document.getElementById(`global-search-result-${selectedSearchIndex}`)?.scrollIntoView({ block: "nearest" });
+  }, [searchOpen, selectedSearchIndex]);
 
   useEffect(() => {
     if (!user) return;
@@ -141,10 +169,45 @@ export default function Home() {
     .toUpperCase();
   const firstName = user.fullName.split(/\s+/)[0];
   const greeting = timeGreeting(new Date(), user.timezone);
+  const searchResults = buildSearchResults(searchQuery, problems);
 
   const handleSubmissionCreated = (submission: Submission) => {
     setSubmissions((current) => [submission, ...current.filter((item) => item.id !== submission.id)]);
     setSubmissionCount((current) => current + 1);
+  };
+
+  const openSearch = () => {
+    setSearchQuery("");
+    setSelectedSearchIndex(0);
+    setProfileOpen(false);
+    setSearchOpen(true);
+  };
+
+  const openSearchResult = (result: GlobalSearchResult) => {
+    setSearchOpen(false);
+    setSearchQuery("");
+    if (result.type === "problem") {
+      setPracticeProblemSlug(result.target);
+      setActiveNav("Practice");
+    } else {
+      setActiveNav(result.target);
+    }
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const handleSearchKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      setSelectedSearchIndex((current) => Math.min(current + 1, searchResults.length - 1));
+    }
+    if (event.key === "ArrowUp") {
+      event.preventDefault();
+      setSelectedSearchIndex((current) => Math.max(current - 1, 0));
+    }
+    if (event.key === "Enter" && searchResults[selectedSearchIndex]) {
+      event.preventDefault();
+      openSearchResult(searchResults[selectedSearchIndex]);
+    }
   };
 
   const handleLogout = async () => {
@@ -173,6 +236,59 @@ export default function Home() {
           aria-label="Close navigation"
           onClick={() => setMenuOpen(false)}
         />
+      )}
+
+      {searchOpen && (
+        <div className="search-overlay" role="presentation" onMouseDown={() => setSearchOpen(false)}>
+          <section className="search-dialog" role="dialog" aria-modal="true" aria-label="Search InterviewOS" onMouseDown={(event) => event.stopPropagation()}>
+            <div className="search-input-row">
+              <Search size={20} />
+              <input
+                ref={searchInputRef}
+                value={searchQuery}
+                onChange={(event) => {
+                  setSearchQuery(event.target.value);
+                  setSelectedSearchIndex(0);
+                }}
+                onKeyDown={handleSearchKeyDown}
+                placeholder="Search pages, problems, or DSA concepts..."
+                aria-label="Search pages and problems"
+                aria-controls="global-search-results"
+              />
+              <kbd>ESC</kbd>
+            </div>
+            <div className="search-results" id="global-search-results" role="listbox">
+              <div className="search-results-heading">
+                <span>{searchQuery.trim() ? "SEARCH RESULTS" : "QUICK ACCESS"}</span>
+                <small>{searchResults.length} available</small>
+              </div>
+              {searchResults.length === 0 ? (
+                <div className="search-empty"><Search size={22} /><strong>No results found</strong><p>Try a problem title, topic, difficulty, or workspace page.</p></div>
+              ) : searchResults.map((result, index) => {
+                const ResultIcon = result.type === "problem"
+                  ? Code2
+                  : navItems.find((item) => item.label === result.target)?.icon ?? Grid2X2;
+                return (
+                  <button
+                    key={result.id}
+                    id={`global-search-result-${index}`}
+                    className={index === selectedSearchIndex ? "search-result selected" : "search-result"}
+                    onMouseEnter={() => setSelectedSearchIndex(index)}
+                    onClick={() => openSearchResult(result)}
+                    role="option"
+                    aria-selected={index === selectedSearchIndex}
+                  >
+                    <span className="search-result-icon"><ResultIcon size={18} /></span>
+                    <span className="search-result-copy"><strong>{result.title}</strong><small>{result.description}</small></span>
+                    <span className="search-result-type">{result.type === "problem" ? "Problem" : "Page"}</span>
+                    <ArrowRight size={15} />
+                  </button>
+                );
+              })}
+            </div>
+            <footer className="search-footer"><span><kbd>↑</kbd><kbd>↓</kbd> Navigate</span><span><kbd>Enter</kbd> Open</span><span><kbd>Esc</kbd> Close</span></footer>
+          </section>
+        </div>
       )}
 
       <aside className={`sidebar ${menuOpen ? "sidebar-open" : ""}`}>
@@ -224,10 +340,10 @@ export default function Home() {
           </div>
 
           <div className="top-actions">
-            <button className="search-button" aria-label="Search">
+            <button className="search-button" aria-label="Search pages and problems" onClick={openSearch}>
               <Search size={17} />
               <span>Search anything</span>
-              <kbd>⌘ K</kbd>
+              <kbd>Ctrl K</kbd>
             </button>
             <div className="date-chip"><CalendarDays size={16} /> {formatHeaderDate(new Date(), user.timezone)}</div>
             <div className="profile-menu-wrap">
@@ -534,7 +650,7 @@ function FeaturePage({
   onSubmissionCreated: (submission: Submission) => void;
   onOpenPractice: (problemSlug: string) => void;
 }) {
-  if (active === "Practice") return <PracticeWorkspace problems={problems} initialSlug={practiceProblemSlug} onSubmissionCreated={onSubmissionCreated} />;
+  if (active === "Practice") return <PracticeWorkspace key={practiceProblemSlug || "practice"} problems={problems} initialSlug={practiceProblemSlug} onSubmissionCreated={onSubmissionCreated} />;
   if (active === "Mock Interview") {
     if (problems.length === 0) return <div className="feature-page"><PageHeader kicker="MOCK INTERVIEW / DSA" title="Preparing interview room" description="Loading high-frequency questions from the InterviewOS API..." /></div>;
     return <MockInterview problems={problems} userInitials={userInitials} onOpenWorkspace={onOpenPractice} />;
@@ -1150,6 +1266,14 @@ type TopicCoverage = {
   score: number;
 };
 
+type GlobalSearchResult = {
+  id: string;
+  type: "page" | "problem";
+  title: string;
+  description: string;
+  target: string;
+};
+
 type LearningMetrics = {
   totalAttempts: number;
   attemptedProblems: number;
@@ -1165,6 +1289,49 @@ type LearningMetrics = {
   activityLevels: number[];
   topicCoverage: TopicCoverage[];
 };
+
+function buildSearchResults(query: string, problems: ProblemSummary[]): GlobalSearchResult[] {
+  const normalizedQuery = query.trim().toLowerCase();
+  const pageDescriptions: Record<string, string> = {
+    Dashboard: "Overview of your goals, streak, and weekly activity",
+    Practice: "Browse DSA concepts and solve interview questions",
+    "Mock Interview": "Practice a responsive AI technical interview",
+    "Resume Analyzer": "Analyze your resume against a target role",
+    Progress: "Review attempts, topic coverage, and learning momentum",
+  };
+  const pageResults = navItems
+    .filter((item) => {
+      const searchableText = `${item.label} ${pageDescriptions[item.label]}`.toLowerCase();
+      return !normalizedQuery || searchableText.includes(normalizedQuery);
+    })
+    .map((item) => ({
+      id: `page-${item.label}`,
+      type: "page" as const,
+      title: item.label,
+      description: pageDescriptions[item.label],
+      target: item.label,
+    }));
+  const problemResults = [...problems]
+    .sort(compareImportantProblems)
+    .filter((problem) => {
+      const searchableText = [
+        problem.title,
+        problem.description,
+        problem.difficulty,
+        problem.frequency ?? "",
+        ...problem.topics.map((topic) => topic.name),
+      ].join(" ").toLowerCase();
+      return !normalizedQuery || searchableText.includes(normalizedQuery);
+    })
+    .map((problem) => ({
+      id: `problem-${problem.id}`,
+      type: "problem" as const,
+      title: problem.title,
+      description: `${titleCase(problem.difficulty)} · ${problem.topics.map((topic) => topic.name).join(" · ") || "DSA"}`,
+      target: problem.slug,
+    }));
+  return [...pageResults, ...problemResults].slice(0, 10);
+}
 
 function buildLearningMetrics(submissions: Submission[], problems: ProblemSummary[]): LearningMetrics {
   const now = new Date();
