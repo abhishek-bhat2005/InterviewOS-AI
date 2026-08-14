@@ -53,6 +53,8 @@ import {
   login,
   logout,
   register,
+  requestPasswordReset,
+  resetPassword,
   reviewCode,
   startInterview,
   type CodeReview,
@@ -675,22 +677,42 @@ function LoadingScreen() {
 }
 
 function AuthScreen({ onAuthenticated }: { onAuthenticated: (user: User) => void }) {
-  const [mode, setMode] = useState<"login" | "register">("login");
+  const [mode, setMode] = useState<"login" | "register" | "forgot" | "reset">(() =>
+    typeof window !== "undefined" && new URLSearchParams(window.location.search).has("resetToken") ? "reset" : "login",
+  );
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
 
   const submit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setSubmitting(true);
     setError("");
+    setMessage("");
     try {
-      const authenticatedUser = mode === "register"
-        ? await register({ fullName, email, password })
-        : await login({ email, password });
-      onAuthenticated(authenticatedUser);
+      if (mode === "forgot") {
+        setMessage(await requestPasswordReset(email));
+      } else if (mode === "reset") {
+        if (password !== confirmPassword) {
+          setError("Passwords do not match");
+          return;
+        }
+        const token = new URLSearchParams(window.location.search).get("resetToken") ?? "";
+        setMessage(await resetPassword(token, password));
+        window.history.replaceState({}, "", window.location.pathname);
+        setPassword("");
+        setConfirmPassword("");
+        setMode("login");
+      } else {
+        const authenticatedUser = mode === "register"
+          ? await register({ fullName, email, password })
+          : await login({ email, password });
+        onAuthenticated(authenticatedUser);
+      }
     } catch (requestError) {
       setError(requestError instanceof ApiError ? requestError.message : "Unable to reach the InterviewOS API");
     } finally {
@@ -701,7 +723,16 @@ function AuthScreen({ onAuthenticated }: { onAuthenticated: (user: User) => void
   const switchMode = () => {
     setMode((current) => current === "login" ? "register" : "login");
     setError("");
+    setMessage("");
   };
+
+  const authCopy = mode === "register"
+    ? { eyebrow: "CREATE YOUR WORKSPACE", title: "Start preparing", copy: "Create an account to save your practice history." }
+    : mode === "forgot"
+      ? { eyebrow: "ACCOUNT RECOVERY", title: "Reset your password", copy: "Enter your email and we’ll send you a secure reset link." }
+      : mode === "reset"
+        ? { eyebrow: "CHOOSE A NEW PASSWORD", title: "Create new password", copy: "Use at least 8 characters for your new password." }
+        : { eyebrow: "WELCOME BACK", title: "Sign in to InterviewOS", copy: "Continue from your latest practice session." };
 
   return (
     <main className="auth-shell">
@@ -720,22 +751,25 @@ function AuthScreen({ onAuthenticated }: { onAuthenticated: (user: User) => void
       <section className="auth-form-panel">
         <form className="auth-card" onSubmit={submit}>
           <span className="auth-icon">{mode === "register" ? <UserPlus size={22} /> : <ShieldCheck size={22} />}</span>
-          <p className="eyebrow">{mode === "register" ? "CREATE YOUR WORKSPACE" : "WELCOME BACK"}</p>
-          <h2>{mode === "register" ? "Start preparing" : "Sign in to InterviewOS"}</h2>
-          <p>{mode === "register" ? "Create an account to save your practice history." : "Continue from your latest practice session."}</p>
+          <p className="eyebrow">{authCopy.eyebrow}</p>
+          <h2>{authCopy.title}</h2>
+          <p>{authCopy.copy}</p>
 
           {mode === "register" && (
             <label>Full name<input value={fullName} onChange={(event) => setFullName(event.target.value)} required maxLength={160} autoComplete="name" /></label>
           )}
-          <label>Email<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} required autoComplete="email" /></label>
-          <label>Password<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} required minLength={8} maxLength={72} autoComplete={mode === "register" ? "new-password" : "current-password"} /></label>
+          {mode !== "reset" && <label>Email<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} required autoComplete="email" /></label>}
+          {mode !== "forgot" && <label>Password<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} required minLength={8} maxLength={72} autoComplete={mode === "login" ? "current-password" : "new-password"} /></label>}
+          {mode === "reset" && <label>Confirm password<input type="password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} required minLength={8} maxLength={72} autoComplete="new-password" /></label>}
 
           {error && <div className="auth-error">{error}</div>}
+          {message && <div className="auth-success">{message}</div>}
           <button className="primary-action auth-submit" disabled={submitting}>
-            {submitting ? <><LoaderCircle className="spin-icon" size={17} /> Connecting...</> : mode === "register" ? "Create account" : "Sign in"}
+            {submitting ? <><LoaderCircle className="spin-icon" size={17} /> Please wait...</> : mode === "register" ? "Create account" : mode === "forgot" ? "Send reset link" : mode === "reset" ? "Update password" : "Sign in"}
           </button>
+          {mode === "login" && <button type="button" className="auth-switch auth-forgot" onClick={() => { setMode("forgot"); setError(""); setMessage(""); }}>Forgot password?</button>}
           <button type="button" className="auth-switch" onClick={switchMode}>
-            {mode === "register" ? "Already have an account? Sign in" : "New to InterviewOS? Create an account"}
+            {mode === "login" ? "New to InterviewOS? Create an account" : "Back to sign in"}
           </button>
         </form>
       </section>

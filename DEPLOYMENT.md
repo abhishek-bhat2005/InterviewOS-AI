@@ -37,7 +37,10 @@ copied automatically.
 4. Render detects the root `render.yaml` file.
 5. Enter the three Neon values above when prompted.
 6. Enter `GEMINI_API_KEY` as a Render secret when prompted.
-7. Apply the Blueprint and wait for both services to become live.
+7. Add your email provider's `SMTP_HOST`, `SMTP_USERNAME`, `SMTP_PASSWORD`, and
+   verified sender address as `MAIL_FROM`. Keep port `587`, authentication, and
+   STARTTLS enabled unless your provider specifies different values.
+8. Apply the Blueprint and wait for both services to become live.
 
 The Blueprint creates:
 
@@ -60,6 +63,8 @@ URLs, then redeploy both services.
 5. Submit a Java or Python solution.
 6. Confirm the attempt appears in submission history.
 7. Test Gemini review after the API quota is available.
+8. Select **Forgot password?**, request a reset, open the email link, and choose
+   a new password. The link expires after 30 minutes and works only once.
 
 ## Free-tier limitations
 

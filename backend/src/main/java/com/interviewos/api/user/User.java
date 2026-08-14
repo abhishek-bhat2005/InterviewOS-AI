@@ -116,6 +116,10 @@ public class User {
         return enabled;
     }
 
+    public void changePassword(String passwordHash) {
+        this.passwordHash = passwordHash;
+    }
+
     public Instant getCreatedAt() {
         return createdAt;
     }

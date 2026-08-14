@@ -60,9 +60,11 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 .auth-card input { width: 100%; height: 44px; border: 1px solid var(--border); border-radius: 8px; outline: none; padding: 0 12px; background: #0d1311; color: var(--text); font: 12px monospace; }
 .auth-card input:focus { border-color: #4b816f; box-shadow: 0 0 0 3px rgba(99,221,183,0.07); }
 .auth-error, .api-banner { margin-top: 16px; padding: 11px 13px; border: 1px solid #783f43; border-radius: 8px; background: rgba(202, 71, 79, 0.08); color: #f4a8ac; font: 10px/1.5 monospace; }
+.auth-success { margin-top: 16px; padding: 11px 13px; border: 1px solid #3e6659; border-radius: 8px; background: rgba(99,221,183,0.08); color: var(--mint-soft); font: 10px/1.5 monospace; }
 .auth-submit { height: 47px; margin-top: 22px; }
 .auth-submit:disabled { transform: none; }
 .auth-switch { width: 100%; margin-top: 17px; border: 0; background: none; color: var(--mint); font: 10px monospace; cursor: pointer; }
+.auth-forgot { margin-top: 13px; color: #bac5c0; }
 
 .app-shell { min-height: 100vh; display: flex; }
 

@@ -29,25 +29,35 @@ public class AuthService {
 
     private final UserRepository userRepository;
     private final RefreshTokenRepository refreshTokenRepository;
+    private final PasswordResetTokenRepository passwordResetTokenRepository;
+    private final PasswordResetMailService passwordResetMailService;
     private final PasswordEncoder passwordEncoder;
     private final String dummyPasswordHash;
     private final JwtService jwtService;
     private final JwtProperties jwtProperties;
+    private final long passwordResetTokenMinutes;
     private final SecureRandom secureRandom = new SecureRandom();
 
     public AuthService(
             UserRepository userRepository,
             RefreshTokenRepository refreshTokenRepository,
+            PasswordResetTokenRepository passwordResetTokenRepository,
+            PasswordResetMailService passwordResetMailService,
             PasswordEncoder passwordEncoder,
             JwtService jwtService,
-            JwtProperties jwtProperties
+            JwtProperties jwtProperties,
+            @org.springframework.beans.factory.annotation.Value("${interviewos.password-reset.token-minutes}")
+            long passwordResetTokenMinutes
     ) {
         this.userRepository = userRepository;
         this.refreshTokenRepository = refreshTokenRepository;
+        this.passwordResetTokenRepository = passwordResetTokenRepository;
+        this.passwordResetMailService = passwordResetMailService;
         this.passwordEncoder = passwordEncoder;
         this.dummyPasswordHash = passwordEncoder.encode("interviewos-invalid-login");
         this.jwtService = jwtService;
         this.jwtProperties = jwtProperties;
+        this.passwordResetTokenMinutes = passwordResetTokenMinutes;
     }
 
     @Transactional
@@ -90,6 +100,38 @@ public class AuthService {
     }
 
     @Transactional
+    public void requestPasswordReset(String requestedEmail) {
+        userRepository.findByEmailIgnoreCase(normalizeEmail(requestedEmail)).ifPresent(user -> {
+            boolean requestedRecently = passwordResetTokenRepository.findTopByUserOrderByCreatedAtDesc(user)
+                    .map(token -> token.getCreatedAt().isAfter(Instant.now().minus(Duration.ofMinutes(1))))
+                    .orElse(false);
+            if (requestedRecently) {
+                return;
+            }
+            passwordResetTokenRepository.deleteByUser(user);
+            byte[] tokenBytes = new byte[48];
+            secureRandom.nextBytes(tokenBytes);
+            String rawToken = Base64.getUrlEncoder().withoutPadding().encodeToString(tokenBytes);
+            passwordResetTokenRepository.save(new PasswordResetToken(
+                    user, hash(rawToken), Instant.now().plus(Duration.ofMinutes(passwordResetTokenMinutes))));
+            passwordResetMailService.send(user, rawToken);
+        });
+    }
+
+    @Transactional
+    public void resetPassword(String rawToken, String newPassword) {
+        PasswordResetToken resetToken = passwordResetTokenRepository.findByTokenHash(hash(rawToken))
+                .orElseThrow(() -> invalidResetToken());
+        if (resetToken.getUsedAt() != null || !resetToken.getExpiresAt().isAfter(Instant.now())) {
+            throw invalidResetToken();
+        }
+        User user = resetToken.getUser();
+        user.changePassword(passwordEncoder.encode(newPassword));
+        resetToken.markUsed();
+        refreshTokenRepository.deleteByUserId(user.getId());
+    }
+
+    @Transactional
     public void logout(String rawToken) {
         refreshTokenRepository.findByTokenHash(hash(rawToken)).ifPresent(token -> {
             if (token.getRevokedAt() == null) {
@@ -121,6 +163,11 @@ public class AuthService {
 
     private String normalizeEmail(String email) {
         return email.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private ResponseStatusException invalidResetToken() {
+        return new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                "This password reset link is invalid or has expired");
     }
 
     private String hash(String value) {

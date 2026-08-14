@@ -1,9 +1,12 @@
 package com.interviewos.api.auth;
 
 import com.interviewos.api.auth.AuthDtos.LoginRequest;
+import com.interviewos.api.auth.AuthDtos.ForgotPasswordRequest;
 import com.interviewos.api.auth.AuthDtos.LogoutRequest;
 import com.interviewos.api.auth.AuthDtos.RefreshRequest;
 import com.interviewos.api.auth.AuthDtos.RegisterRequest;
+import com.interviewos.api.auth.AuthDtos.ResetPasswordRequest;
+import com.interviewos.api.auth.AuthDtos.MessageResponse;
 import com.interviewos.api.auth.AuthDtos.TokenResponse;
 import com.interviewos.api.auth.AuthDtos.UserResponse;
 import jakarta.validation.Valid;
@@ -40,6 +43,19 @@ public class AuthController {
     @PostMapping("/refresh")
     TokenResponse refresh(@Valid @RequestBody RefreshRequest request) {
         return authService.refresh(request.refreshToken());
+    }
+
+    @PostMapping("/forgot-password")
+    ResponseEntity<MessageResponse> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
+        authService.requestPasswordReset(request.email());
+        return ResponseEntity.accepted().body(new MessageResponse(
+                "If an account exists for that email, a password reset link has been sent."));
+    }
+
+    @PostMapping("/reset-password")
+    MessageResponse resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+        authService.resetPassword(request.token(), request.password());
+        return new MessageResponse("Password updated. You can now sign in.");
     }
 
     @PostMapping("/logout")

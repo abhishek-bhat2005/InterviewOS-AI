@@ -21,6 +21,20 @@ spring:
     baseline-version: 1
   jackson:
     default-property-inclusion: non_null
+  mail:
+    host: ${SMTP_HOST:localhost}
+    port: ${SMTP_PORT:587}
+    username: ${SMTP_USERNAME:}
+    password: ${SMTP_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: ${SMTP_AUTH:true}
+          starttls:
+            enable: ${SMTP_STARTTLS:true}
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
 
 management:
   endpoints:
@@ -39,6 +53,10 @@ interviewos:
     refresh-token-days: ${JWT_REFRESH_TOKEN_DAYS:30}
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000}
+  password-reset:
+    frontend-url: ${PASSWORD_RESET_FRONTEND_URL:http://localhost:5173}
+    from-email: ${MAIL_FROM:no-reply@interviewos.ai}
+    token-minutes: ${PASSWORD_RESET_TOKEN_MINUTES:30}
   gemini:
     api-key: ${GEMINI_API_KEY:}
     model: ${GEMINI_MODEL:gemini-3.6-flash}

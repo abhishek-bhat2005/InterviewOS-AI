@@ -24,6 +24,7 @@ problem data, starter code, and persistent submission history from the API.
 - Flyway migrations and 16 seeded high-frequency DSA problems
 - Problem browsing and authenticated submission-history APIs
 - Frontend registration/login with automatic access-token refresh
+- Secure email password recovery with expiring, single-use reset links
 - Concept-first practice selection with ranked interview questions
 - Gemini-powered structured code assessment
 
@@ -123,6 +124,7 @@ Key endpoints:
 
 - `POST /api/auth/register`, `POST /api/auth/login`
 - `POST /api/auth/refresh`, `POST /api/auth/logout`
+- `POST /api/auth/forgot-password`, `POST /api/auth/reset-password`
 - `GET /api/auth/me`
 - `GET /api/problems`, `GET /api/problems/{slug}`
 - `POST /api/problems/{problemId}/submissions`

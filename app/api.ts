@@ -166,6 +166,24 @@ export async function login(input: {
   return response.user;
 }
 
+export async function requestPasswordReset(email: string): Promise<string> {
+  const response = await apiRequest<{ message: string }>(
+    "/auth/forgot-password",
+    { method: "POST", body: JSON.stringify({ email }) },
+    false,
+  );
+  return response.message;
+}
+
+export async function resetPassword(token: string, password: string): Promise<string> {
+  const response = await apiRequest<{ message: string }>(
+    "/auth/reset-password",
+    { method: "POST", body: JSON.stringify({ token, password }) },
+    false,
+  );
+  return response.message;
+}
+
 export async function getCurrentUser(): Promise<User> {
   const user = await apiRequest<User>("/auth/me");
   storeUser(user);
