@@ -192,20 +192,20 @@ export async function getCurrentUser(): Promise<User> {
 
 export async function logout(): Promise<void> {
   const refreshToken = getStoredToken(REFRESH_TOKEN_KEY);
-  try {
-    if (refreshToken) {
-      await apiRequest<void>(
+  const revokeSession = refreshToken
+    ? apiRequest<void>(
         "/auth/logout",
         {
           method: "POST",
           body: JSON.stringify({ refreshToken }),
         },
         false,
-      );
-    }
-  } finally {
-    clearSession();
-  }
+      )
+    : Promise.resolve();
+
+  // Signing out locally must not wait for a sleeping or unavailable API.
+  clearSession();
+  await revokeSession.catch(() => undefined);
 }
 
 export async function getProblems(): Promise<PageResponse<ProblemSummary>> {

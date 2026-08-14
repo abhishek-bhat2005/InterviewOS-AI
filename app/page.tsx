@@ -287,14 +287,13 @@ export default function Home() {
     }
   };
 
-  const handleLogout = async () => {
-    try {
-      await logout();
-    } finally {
-      setUser(null);
-      setSubmissions([]);
-      setSubmissionCount(0);
-    }
+  const handleLogout = () => {
+    void logout();
+    setUser(null);
+    setSubmissions([]);
+    setSubmissionCount(0);
+    setProfileOpen(false);
+    setMenuOpen(false);
   };
 
   return (
