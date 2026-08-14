@@ -18,6 +18,8 @@ import {
   Flame,
   Gauge,
   Grid2X2,
+  Eye,
+  EyeOff,
   LoaderCircle,
   LogOut,
   Menu,
@@ -683,7 +685,10 @@ function AuthScreen({ onAuthenticated }: { onAuthenticated: (user: User) => void
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [passwordVisible, setPasswordVisible] = useState(false);
+  const [confirmPasswordVisible, setConfirmPasswordVisible] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [requestTakingLong, setRequestTakingLong] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
 
@@ -692,6 +697,8 @@ function AuthScreen({ onAuthenticated }: { onAuthenticated: (user: User) => void
     setSubmitting(true);
     setError("");
     setMessage("");
+    setRequestTakingLong(false);
+    const slowRequestTimer = window.setTimeout(() => setRequestTakingLong(true), 5_000);
     try {
       if (mode === "forgot") {
         setMessage(await requestPasswordReset(email));
@@ -715,6 +722,8 @@ function AuthScreen({ onAuthenticated }: { onAuthenticated: (user: User) => void
     } catch (requestError) {
       setError(requestError instanceof ApiError ? requestError.message : "Unable to reach the InterviewOS API");
     } finally {
+      window.clearTimeout(slowRequestTimer);
+      setRequestTakingLong(false);
       setSubmitting(false);
     }
   };
@@ -723,6 +732,8 @@ function AuthScreen({ onAuthenticated }: { onAuthenticated: (user: User) => void
     setMode((current) => current === "login" ? "register" : "login");
     setError("");
     setMessage("");
+    setPasswordVisible(false);
+    setConfirmPasswordVisible(false);
   };
 
   const authCopy = mode === "register"
@@ -758,11 +769,30 @@ function AuthScreen({ onAuthenticated }: { onAuthenticated: (user: User) => void
             <label>Full name<input value={fullName} onChange={(event) => setFullName(event.target.value)} required maxLength={160} autoComplete="name" /></label>
           )}
           {mode !== "reset" && <label>Email<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} required autoComplete="email" /></label>}
-          {mode !== "forgot" && <label>Password<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} required minLength={8} maxLength={72} autoComplete={mode === "login" ? "current-password" : "new-password"} /></label>}
-          {mode === "reset" && <label>Confirm password<input type="password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} required minLength={8} maxLength={72} autoComplete="new-password" /></label>}
+          {mode !== "forgot" && (
+            <label>Password
+              <span className="password-input-wrap">
+                <input type={passwordVisible ? "text" : "password"} value={password} onChange={(event) => setPassword(event.target.value)} required minLength={8} maxLength={72} autoComplete={mode === "login" ? "current-password" : "new-password"} />
+                <button type="button" onClick={() => setPasswordVisible((visible) => !visible)} aria-label={passwordVisible ? "Hide password" : "Show password"} aria-pressed={passwordVisible}>
+                  {passwordVisible ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </span>
+            </label>
+          )}
+          {mode === "reset" && (
+            <label>Confirm password
+              <span className="password-input-wrap">
+                <input type={confirmPasswordVisible ? "text" : "password"} value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} required minLength={8} maxLength={72} autoComplete="new-password" />
+                <button type="button" onClick={() => setConfirmPasswordVisible((visible) => !visible)} aria-label={confirmPasswordVisible ? "Hide confirmation password" : "Show confirmation password"} aria-pressed={confirmPasswordVisible}>
+                  {confirmPasswordVisible ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </span>
+            </label>
+          )}
 
           {error && <div className="auth-error">{error}</div>}
           {message && <div className="auth-success">{message}</div>}
+          {requestTakingLong && <div className="auth-waking">The free server is waking up. This can take up to a minute; your request is still in progress.</div>}
           <button className="primary-action auth-submit" disabled={submitting}>
             {submitting ? <><LoaderCircle className="spin-icon" size={17} /> Please wait...</> : mode === "register" ? "Create account" : mode === "forgot" ? "Send reset link" : mode === "reset" ? "Update password" : "Sign in"}
           </button>

@@ -4,6 +4,7 @@ const API_BASE_URL =
 const ACCESS_TOKEN_KEY = "interviewos.accessToken";
 const REFRESH_TOKEN_KEY = "interviewos.refreshToken";
 const USER_KEY = "interviewos.user";
+const REQUEST_TIMEOUT_MS = 45_000;
 
 let refreshPromise: Promise<boolean> | null = null;
 
@@ -280,7 +281,23 @@ async function apiRequest<T>(
   const accessToken = getStoredToken(ACCESS_TOKEN_KEY);
   if (accessToken) headers.set("Authorization", `Bearer ${accessToken}`);
 
-  const response = await fetch(`${API_BASE_URL}${path}`, { ...init, headers });
+  const timeoutController = new AbortController();
+  const timeoutId = window.setTimeout(() => timeoutController.abort(), REQUEST_TIMEOUT_MS);
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, {
+      ...init,
+      headers,
+      signal: init.signal ?? timeoutController.signal,
+    });
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw new ApiError("The server is still waking up. Please wait a moment and try again.", 408);
+    }
+    throw error;
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
   if (response.status === 401 && retryWithRefresh && hasStoredSession()) {
     const refreshed = await refreshSession();
     if (refreshed) return apiRequest<T>(path, init, false);
