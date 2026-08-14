@@ -3,6 +3,9 @@ const API_BASE_URL =
 
 const ACCESS_TOKEN_KEY = "interviewos.accessToken";
 const REFRESH_TOKEN_KEY = "interviewos.refreshToken";
+const USER_KEY = "interviewos.user";
+
+let refreshPromise: Promise<boolean> | null = null;
 
 export type User = {
   id: string;
@@ -119,6 +122,17 @@ export function hasStoredSession(): boolean {
   return Boolean(getStoredToken(REFRESH_TOKEN_KEY));
 }
 
+export function getStoredUser(): User | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const value = window.localStorage.getItem(USER_KEY);
+    return value ? (JSON.parse(value) as User) : null;
+  } catch {
+    window.localStorage.removeItem(USER_KEY);
+    return null;
+  }
+}
+
 export async function register(input: {
   fullName: string;
   email: string;
@@ -153,7 +167,9 @@ export async function login(input: {
 }
 
 export async function getCurrentUser(): Promise<User> {
-  return apiRequest<User>("/auth/me");
+  const user = await apiRequest<User>("/auth/me");
+  storeUser(user);
+  return user;
 }
 
 export async function logout(): Promise<void> {
@@ -231,6 +247,7 @@ export function clearSession(): void {
   if (typeof window === "undefined") return;
   window.localStorage.removeItem(ACCESS_TOKEN_KEY);
   window.localStorage.removeItem(REFRESH_TOKEN_KEY);
+  window.localStorage.removeItem(USER_KEY);
 }
 
 async function apiRequest<T>(
@@ -261,6 +278,17 @@ async function apiRequest<T>(
 }
 
 async function refreshSession(): Promise<boolean> {
+  if (refreshPromise) return refreshPromise;
+
+  refreshPromise = performRefresh();
+  try {
+    return await refreshPromise;
+  } finally {
+    refreshPromise = null;
+  }
+}
+
+async function performRefresh(): Promise<boolean> {
   const refreshToken = getStoredToken(REFRESH_TOKEN_KEY);
   if (!refreshToken) return false;
 
@@ -288,6 +316,12 @@ function storeTokens(response: TokenResponse): void {
   if (typeof window === "undefined") return;
   window.localStorage.setItem(ACCESS_TOKEN_KEY, response.accessToken);
   window.localStorage.setItem(REFRESH_TOKEN_KEY, response.refreshToken);
+  storeUser(response.user);
+}
+
+function storeUser(user: User): void {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(USER_KEY, JSON.stringify(user));
 }
 
 function getStoredToken(key: string): string | null {

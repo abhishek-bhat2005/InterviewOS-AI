@@ -47,6 +47,7 @@ import {
   getCurrentUser,
   getProblem,
   getProblems,
+  getStoredUser,
   getSubmissions,
   hasStoredSession,
   login,
@@ -119,8 +120,8 @@ export default function Home() {
   const [assessmentOpen, setAssessmentOpen] = useState(false);
   const [assessmentAnswers, setAssessmentAnswers] = useState<number[]>([]);
   const [bookmarked, setBookmarked] = useState(false);
-  const [user, setUser] = useState<User | null>(null);
-  const [sessionLoading, setSessionLoading] = useState(true);
+  const [user, setUser] = useState<User | null>(() => getStoredUser());
+  const [sessionLoading, setSessionLoading] = useState(() => hasStoredSession() && !getStoredUser());
   const [problems, setProblems] = useState<ProblemSummary[]>([]);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [submissionCount, setSubmissionCount] = useState(0);
@@ -130,11 +131,15 @@ export default function Home() {
 
   useEffect(() => {
     const restoreSession = async () => {
-      if (!hasStoredSession()) return;
+      if (!hasStoredSession()) {
+        setUser(null);
+        return;
+      }
       try {
         setUser(await getCurrentUser());
       } catch {
         clearSession();
+        setUser(null);
       }
     };
 

@@ -17,9 +17,8 @@ import java.time.Instant;
 import java.util.Base64;
 import java.util.HexFormat;
 import java.util.Locale;
+import java.util.Optional;
 import org.springframework.http.HttpStatus;
-import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,7 +30,7 @@ public class AuthService {
     private final UserRepository userRepository;
     private final RefreshTokenRepository refreshTokenRepository;
     private final PasswordEncoder passwordEncoder;
-    private final AuthenticationManager authenticationManager;
+    private final String dummyPasswordHash;
     private final JwtService jwtService;
     private final JwtProperties jwtProperties;
     private final SecureRandom secureRandom = new SecureRandom();
@@ -40,14 +39,13 @@ public class AuthService {
             UserRepository userRepository,
             RefreshTokenRepository refreshTokenRepository,
             PasswordEncoder passwordEncoder,
-            AuthenticationManager authenticationManager,
             JwtService jwtService,
             JwtProperties jwtProperties
     ) {
         this.userRepository = userRepository;
         this.refreshTokenRepository = refreshTokenRepository;
         this.passwordEncoder = passwordEncoder;
-        this.authenticationManager = authenticationManager;
+        this.dummyPasswordHash = passwordEncoder.encode("interviewos-invalid-login");
         this.jwtService = jwtService;
         this.jwtProperties = jwtProperties;
     }
@@ -68,10 +66,13 @@ public class AuthService {
     @Transactional
     public TokenResponse login(LoginRequest request) {
         String email = normalizeEmail(request.email());
-        authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(email, request.password()));
-        User user = userRepository.findByEmailIgnoreCase(email)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid email or password"));
-        return issueTokens(user);
+        Optional<User> matchingUser = userRepository.findByEmailIgnoreCase(email);
+        String passwordHash = matchingUser.map(User::getPasswordHash).orElse(dummyPasswordHash);
+        boolean passwordMatches = passwordEncoder.matches(request.password(), passwordHash);
+        if (matchingUser.isEmpty() || !matchingUser.get().isEnabled() || !passwordMatches) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid email or password");
+        }
+        return issueTokens(matchingUser.get());
     }
 
     @Transactional
