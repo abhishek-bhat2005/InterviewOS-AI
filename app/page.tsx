@@ -40,7 +40,7 @@ import {
   Zap,
   X,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import {
   ApiError,
   clearSession,
@@ -75,6 +75,10 @@ const navItems = [
   { label: "Resume Analyzer", icon: FileSearch },
   { label: "Progress", icon: BarChart3 },
 ];
+
+const subscribeToResetToken = () => () => {};
+const getResetTokenFromUrl = () => new URLSearchParams(window.location.search).get("resetToken")?.trim() ?? "";
+const getServerResetToken = () => "";
 
 const skillAssessmentQuestions = [
   {
@@ -126,8 +130,10 @@ export default function Home() {
   const [bookmarked, setBookmarked] = useState(false);
   const [user, setUser] = useState<User | null>(() => getStoredUser());
   const [sessionLoading, setSessionLoading] = useState(() => hasStoredSession() && !getStoredUser());
+  const resetToken = useSyncExternalStore(subscribeToResetToken, getResetTokenFromUrl, getServerResetToken);
   const [problems, setProblems] = useState<ProblemSummary[]>([]);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
+
   const [submissionCount, setSubmissionCount] = useState(0);
   const [backendOnline, setBackendOnline] = useState(false);
   const [practiceProblemSlug, setPracticeProblemSlug] = useState("");
@@ -206,7 +212,9 @@ export default function Home() {
   }, [user]);
 
   if (sessionLoading) return <LoadingScreen />;
-  if (!user) return <AuthScreen onAuthenticated={setUser} />;
+  if (resetToken || !user) {
+    return <AuthScreen key={resetToken ? "password-reset" : "auth"} resetToken={resetToken} onAuthenticated={setUser} />;
+  }
 
   const metrics = buildLearningMetrics(submissions, problems);
   const featuredProblem =
@@ -677,10 +685,8 @@ function LoadingScreen() {
   );
 }
 
-function AuthScreen({ onAuthenticated }: { onAuthenticated: (user: User) => void }) {
-  const [mode, setMode] = useState<"login" | "register" | "forgot" | "reset">(() =>
-    typeof window !== "undefined" && new URLSearchParams(window.location.search).has("resetToken") ? "reset" : "login",
-  );
+function AuthScreen({ resetToken, onAuthenticated }: { resetToken: string; onAuthenticated: (user: User) => void }) {
+  const [mode, setMode] = useState<"login" | "register" | "forgot" | "reset">(resetToken ? "reset" : "login");
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -707,8 +713,11 @@ function AuthScreen({ onAuthenticated }: { onAuthenticated: (user: User) => void
           setError("Passwords do not match");
           return;
         }
-        const token = new URLSearchParams(window.location.search).get("resetToken") ?? "";
-        setMessage(await resetPassword(token, password));
+        if (!resetToken) {
+          setError("This password reset link is invalid. Please request a new one.");
+          return;
+        }
+        setMessage(await resetPassword(resetToken, password));
         window.history.replaceState({}, "", window.location.pathname);
         setPassword("");
         setConfirmPassword("");
